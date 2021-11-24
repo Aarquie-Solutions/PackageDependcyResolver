@@ -1,7 +1,7 @@
 {
   "name": "com.aarquiesolutions.packagedependencyresolver",
   "version": "1.0.0",
-  "displayName": "UnityPackageManager Utilities",
+  "displayName": "Package Dependency Resolver",
   "description": "That package has a utility to resolve Git Dependencies inside custom packages installed in the project.",
   "type": "tool"
 }
