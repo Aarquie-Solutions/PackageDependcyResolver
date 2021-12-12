@@ -95,10 +95,10 @@ namespace AarquieSolutions.PackageDependencyResolverTool
                 && TryGetGitDependencies(installedPackages, out var gitDependencies))
             {
                 result = gitDependencies
-                    .Where(x => !installedPackages.Exists(i => i.name.Equals(x.Key)))
+                    .Where(x => !installedPackages.Exists(i => i.name == x.Key))
                     .ToArray();
-
-                return result?.Length > 0;
+   
+                 return result?.Length > 0;
             }
 
             result = default;
