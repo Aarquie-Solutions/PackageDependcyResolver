@@ -1,7 +1,7 @@
 {
-  "name": "com.aarquiesolutions.packagedependencyresolver",
+  "name": "com.aarquiesolutions.packagedependencyresolvertool",
   "version": "1.0.0",
-  "displayName": "Package Dependency Resolver",
-  "description": "That package has a utility to resolve Git Dependencies inside custom packages installed in the project.",
+  "displayName": "Package Dependency Resolver Tool",
+  "description": "Tool to resolve package git dependencies forked from \nunity-package-manager-utilities",
   "type": "tool"
 }

@@ -4,120 +4,128 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-[InitializeOnLoad]
-public static class DependenciesResolver
+
+namespace AarquieSolutions.PackageDependencyResolverTool
 {
-    #region Confirmation Dialog Texts
-    private const string DialogTitle = "Dependencies Resolver";
-
-    private const string DialogMessage =
-        "New Git Dependencies were detected in one or more Custom Packages." +
-        "\n\n" +
-        "The dependencies were added to './Packages/manifest.json'." +
-        "\n\n" +
-        "The Unity Package Manager will resolve them after Unity getting unfocused and focused again!";
-
-    private const string DialogOkButton = "Ok";
-    #endregion
-
-    private const string CachedPackagesDirectory = "./Library/PackageCache";
-    private const string LocalPackagesDirectory = "./Packages";
-
-    static DependenciesResolver()
+    [InitializeOnLoad]
+    public static class DependenciesResolver
     {
-        Resolve();
+        #region Confirmation Dialog Texts
 
-        // That is uses because InitializeOnLoad will not get invoked when there are code errors,
-        // and that is exactly the main reason we want to resolve dependencies.
-        Application.logMessageReceived -= OnLogMessageReceived;
-        Application.logMessageReceived += OnLogMessageReceived;
-    }
+        private const string DialogTitle = "Dependencies Resolver";
 
-    private static void OnLogMessageReceived(string condition, string stackTrace, LogType type)
-    {
-        if (type == LogType.Error)
+        private const string DialogMessage =
+            "New Git Dependencies were detected in one or more Custom Packages." +
+            "\n\n" +
+            "The dependencies were added to './Packages/manifest.json'." +
+            "\n\n" +
+            "The Unity Package Manager will resolve them after Unity getting unfocused and focused again!";
+
+        private const string DialogOkButton = "Ok";
+
+        #endregion
+
+        private const string CachedPackagesDirectory = "./Library/PackageCache";
+        private const string LocalPackagesDirectory = "./Packages";
+
+        static DependenciesResolver()
         {
-            Application.logMessageReceived -= OnLogMessageReceived;
             Resolve();
+
+            // That is uses because InitializeOnLoad will not get invoked when there are code errors,
+            // and that is exactly the main reason we want to resolve dependencies.
+            Application.logMessageReceived -= OnLogMessageReceived;
+            Application.logMessageReceived += OnLogMessageReceived;
         }
-    }
 
-    [MenuItem("Window/Package Manager Utils/Resolve Git Dependencies", false, 1502)]
-    public static void Resolve()
-    {
-        if (TryGetUnresolvedGitDependencies(out var unresolvedGitDependencies))
+        private static void OnLogMessageReceived(string condition, string stackTrace, LogType type)
         {
-            try
+            if (type == LogType.Error)
             {
-                AssetDatabase.StartAssetEditing();
+                Application.logMessageReceived -= OnLogMessageReceived;
+                Resolve();
+            }
+        }
 
-                Debug.Log($"Starting to resolve not installed Git Dependencies.");
-
-                if (PackageManagerManifestInfo.TryLoad(out PackageManagerManifestInfo manifestInfo))
+        [MenuItem("Window/Package Manager Utilities/Resolve Git Dependencies", false, 1502)]
+        public static void Resolve()
+        {
+            if (TryGetUnresolvedGitDependencies(out var unresolvedGitDependencies))
+            {
+                try
                 {
-                    var dependencies = manifestInfo.dependencies.ToList();
+                    AssetDatabase.StartAssetEditing();
 
-                    foreach (var item in unresolvedGitDependencies)
+                    Debug.Log($"Starting to resolve not installed Git Dependencies.");
+
+                    if (PackageManagerManifestInfo.TryLoad(out PackageManagerManifestInfo manifestInfo))
                     {
-                        Debug.Log($"Dependency: {item.Key} : {item.Value}");
-                        dependencies.Insert(0, new KeyValuePair<string, string>(item.Key, item.Value));
+                        var dependencies = manifestInfo.dependencies.ToList();
+
+                        foreach (var item in unresolvedGitDependencies)
+                        {
+                            Debug.Log($"Dependency: {item.Key} : {item.Value}");
+                            dependencies.Insert(0, new KeyValuePair<string, string>(item.Key, item.Value));
+                        }
+
+                        manifestInfo.dependencies =
+                            dependencies.Distinct().ToDictionary(pair => pair.Key, pair => pair.Value);
+                        manifestInfo.Save();
+
+                        Debug.Log($"Git Dependencies resolved.");
                     }
-
-                    manifestInfo.dependencies = dependencies.Distinct().ToDictionary(pair => pair.Key, pair => pair.Value);
-                    manifestInfo.Save();
-
-                    Debug.Log($"Git Dependencies resolved.");
                 }
-            }
-            finally
-            {
-                AssetDatabase.StopAssetEditing();
-
-                // Showing that dialog because Unity will not resolve the new entries before the Editor gets unfocused and focused again.
-                if (EditorUtility.DisplayDialog(DialogTitle, DialogMessage, DialogOkButton))
+                finally
                 {
-                    // Recompile the packages
-                    AssetDatabase.Refresh();
+                    AssetDatabase.StopAssetEditing();
+
+                    // Showing that dialog because Unity will not resolve the new entries before the Editor gets unfocused and focused again.
+                    if (EditorUtility.DisplayDialog(DialogTitle, DialogMessage, DialogOkButton))
+                    {
+                        // Recompile the packages
+                        AssetDatabase.Refresh();
+                    }
                 }
             }
         }
-    }
 
-    private static bool TryGetUnresolvedGitDependencies(out KeyValuePair<string, string>[] result)
-    {
-        if (TryGetInstalledPackages(out var installedPackages)
-            && TryGetGitDependencies(installedPackages, out var gitDependencies))
+        private static bool TryGetUnresolvedGitDependencies(out KeyValuePair<string, string>[] result)
         {
-            result = gitDependencies
-                .Where(x => !installedPackages.Exists(i => i.name.Equals(x.Key)))
+            if (TryGetInstalledPackages(out var installedPackages)
+                && TryGetGitDependencies(installedPackages, out var gitDependencies))
+            {
+                result = gitDependencies
+                    .Where(x => !installedPackages.Exists(i => i.name.Equals(x.Key)))
+                    .ToArray();
+
+                return result?.Length > 0;
+            }
+
+            result = default;
+            return false;
+        }
+
+        private static bool TryGetGitDependencies(List<PackageInfo> installedPackages,
+            out KeyValuePair<string, string>[] result)
+        {
+            result = installedPackages
+                .Where(x => !x.Equals(default) && x.gitDependencies?.Count > 0)
+                .SelectMany(x => x.gitDependencies)
+                .Where(x => !string.IsNullOrEmpty(x.Value))
                 .ToArray();
 
             return result?.Length > 0;
         }
 
-        result = default;
-        return false;
-    }
+        private static bool TryGetInstalledPackages(out List<PackageInfo> result)
+        {
+            result = Directory.GetDirectories(CachedPackagesDirectory)
+                .Concat(Directory.GetDirectories(LocalPackagesDirectory))
+                .Select(PackageInfo.GetPackageFromDirectory)
+                .Where(x => !x.Equals(default))
+                .ToList();
 
-    private static bool TryGetGitDependencies(List<PackageInfo> installedPackages, out KeyValuePair<string, string>[] result)
-    {
-        result = installedPackages
-            .Where(x => !x.Equals(default) && x.gitDependencies?.Count > 0)
-            .SelectMany(x => x.gitDependencies)
-            .Where(x => !string.IsNullOrEmpty(x.Value))
-            .ToArray();
-
-        return result?.Length > 0;
-    }
-
-    private static bool TryGetInstalledPackages(out List<PackageInfo> result)
-    {
-        result = Directory.GetDirectories(CachedPackagesDirectory)
-            .Concat(Directory.GetDirectories(LocalPackagesDirectory))
-            .Select(PackageInfo.GetPackageFromDirectory)
-            .Where(x => !x.Equals(default))
-            .ToList();
-
-        return result?.Count > 0;
+            return result?.Count > 0;
+        }
     }
 }

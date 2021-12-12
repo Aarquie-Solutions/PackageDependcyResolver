@@ -1,6 +1,6 @@
 {
-    "name": "aarquiesolutions.packagedependencyresolver.editor",
-    "rootNamespace": "",
+    "name": "aarquiesolutions.packagedependencyresolvertool.editor",
+    "rootNamespace": "AarquieSolutions.PackageDependencyResolverTool",
     "references": [],
     "includePlatforms": [
         "Editor"
